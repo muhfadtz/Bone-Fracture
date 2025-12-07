@@ -1,36 +1,229 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+---
 
-## Getting Started
+# Bone Fracture Classification – Deep Learning Model & API (Hugging Face Space)
 
-First, run the development server:
+## Overview
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+This project provides a deep learning model for **binary classification of bone fracture from X-ray images**. It is designed as a research/educational tool to demonstrate medical image classification using EfficientNet-B0 and TensorFlow.
+
+The model is deployed on **Hugging Face Spaces** as a lightweight inference backend with a public API. The API can be consumed directly from any frontend application (React, Vue, Next.js, web builder, mobile apps, or client-side JavaScript) without the need for a custom backend service.
+
+> **Disclaimer**
+> This model is intended only for research, experimentation, and educational demonstration.
+> It is **not a medical device** and should **not be used for clinical diagnosis or medical decision-making**.
+
+---
+
+## Features
+
+* Binary classification:
+
+  * `fracture`
+  * `normal`
+* EfficientNet-B0 fine-tuned using transfer learning
+* Trained on imbalanced dataset using class weighting
+* Inference deployed using **Gradio Space**
+* Public endpoint suitable for client-side consumption
+* JSON response including:
+
+  * predicted label
+  * fracture probability
+  * normal probability
+
+---
+
+## Architecture
+
+### Model Training
+
+* Base architecture: **EfficientNet-B0**
+* Framework: **TensorFlow / Keras**
+* Phases:
+
+  1. **Feature extraction**
+  2. **Fine-tuning**
+* Dataset:
+
+  * `fracture`: 2,000 images
+  * `normal`: 127 images
+* Image size: `224 × 224`
+* Loss: `binary_crossentropy`
+* Metrics: `accuracy`, `precision`, `recall`, `AUC`
+
+### Deployment
+
+* Model stored in `model.keras` (full architecture + weights)
+* Served in Hugging Face Spaces using:
+
+  * `gradio` interface (interactive UI + API)
+  * `tensorflow-cpu`
+  * `numpy`
+  * `pillow`
+
+---
+
+## Repository Structure
+
+```
+.
+├─ app.py                 # Gradio inference script
+├─ model.keras            # Full TensorFlow Keras model
+├─ requirements.txt       # Runtime dependencies
+└─ README.md              # Documentation
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Live Demo
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The deployed application can be accessed here:
 
-## Learn More
+```
+https://huggingface.co/spaces/Dawgggggg/bone-fracture
+```
 
-To learn more about Next.js, take a look at the following resources:
+Users may upload X-ray images directly in the web UI to test fracture classification.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## API Usage
 
-## Deploy on Vercel
+The Space automatically exposes the prediction function as a **public HTTP endpoint**.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Prediction Endpoint
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+POST https://dawgggggg-bone-fracture.hf.space/run/predict
+```
+
+### Expected Input
+
+* One image file sent as `multipart/form-data`
+* Example (raw fetch):
+
+```js
+const formData = new FormData();
+formData.append("data", file);
+
+const res = await fetch(
+  "https://dawgggggg-bone-fracture.hf.space/run/predict",
+  { method: "POST", body: formData }
+);
+
+const json = await res.json();
+```
+
+### API Response Format
+
+```json
+{
+  "data": [
+    {
+      "predicted_label": "fracture",
+      "fracture_probability": 0.9345,
+      "normal_probability": 0.0655
+    }
+  ]
+}
+```
+
+### Response Interpretation
+
+* `predicted_label` → primary model prediction
+* `fracture_probability` → probability that the image indicates a fracture
+* `normal_probability` → complementary probability
+
+---
+
+## TypeScript Helper Example (Client-Side)
+
+This function connects to the Space and classifies an image:
+
+```ts
+import { Client, handle_file } from "@gradio/client";
+
+export async function classifyImage(file: File) {
+  const client = await Client.connect("Dawgggggg/bone-fracture");
+  const result = await client.predict("/predict", [
+    handle_file(file),
+  ]);
+
+  const raw = result.data[0];
+  return {
+    label: raw.predicted_label,
+    fracture: raw.fracture_probability,
+    normal: raw.normal_probability,
+  };
+}
+```
+
+---
+
+## Handling Space Sleep / Wake (Retry)
+
+Because free Spaces may sleep when inactive, add exponential retry:
+
+```ts
+// recommended implementation with retry logic
+// (see api.ts in repository for full implementation)
+```
+
+This prevents client timeout when the Space is waking up.
+
+---
+
+## Frontend Integration
+
+The API allows frictionless integration with:
+
+* React / Next.js / Vue
+* Vanilla JavaScript
+* Mobile apps (e.g., Flutter, React Native)
+* App builders (Bubble, Appsmith, ToolJet, etc.)
+* Static web apps (CDN)
+
+No backend is required — client applications communicate directly with the Space.
+
+---
+
+## Gradio Backend Logic (Summary)
+
+`app.py`:
+
+* Loads TensorFlow model (`model.keras`)
+* Preprocesses uploaded image
+* Performs inference
+* Returns JSON containing:
+
+  * label
+  * fracture probability
+  * normal probability
+
+---
+
+## Requirements
+
+```
+tensorflow-cpu
+numpy
+pillow
+gradio
+```
+
+---
+
+## Limitations
+
+* Dataset is imbalanced
+* Not medically validated
+* Results may not generalize to clinical environments
+* Intended solely for research, prototyping, and academic demonstration
+
+---
+
+## License
+
+This repository and model can be used for research and educational purposes.
+Redistribution, clinical deployment, or diagnostic use is not permitted without explicit approval.
+
+---
